@@ -71,6 +71,13 @@
                  (const "shimmer"))
   :group 'vips)
 
+(defcustom vips-response-hooks nil
+  "A list of hooks to run when the response.
+The function takes the LLM response as a string when it succeeds.  When it
+fails the parameters is the error symbol."
+  :type 'hook
+  :group 'vips)
+
 (defun vips-select-voice ()
   "Prompt user to select a voice and set the global variable 'vips-selected-voice' to the selected voice."
   (interactive)
@@ -263,10 +270,15 @@ Optional API-URL is the URL of the API; defaults to OpenAI's URL."
                 (lambda (&key data &allow-other-keys)
                   (with-current-buffer current-buffer
                     (goto-char insertion-marker)
-                    (insert (concat "\n" (alist-get 'content (alist-get 'message (elt (alist-get 'choices data) 0))))))
+		    (let ((content (alist-get 'content (alist-get 'message (elt (alist-get 'choices data) 0)))))
+		      (insert (concat "\n" content))
+		      (dolist (fn vips-response-hooks)
+			(funcall fn content))))
                   (message "Response inserted.")))
       :error (cl-function
               (lambda (&key error-thrown &allow-other-keys)
+		(dolist (fn vips-response-hooks)
+		  (funcall fn error-thrown))
                 (message "Error: %S" error-thrown))))
     nil))
 
